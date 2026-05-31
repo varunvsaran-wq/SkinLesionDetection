@@ -53,11 +53,18 @@ The novel part is the **orchestration + resumable human-review gate**, not the M
   Relevance notes are extractive by default; an opt-in Claude-authored mode is
   gated behind `LITERATURE_CLAUDE_CITATIONS`. The `literature` node falls back to
   mock references when `MCP_ENDPOINT` is unset/unreachable or deps are missing.
-  Enable with `uv sync --extra literature` and point `MCP_ENDPOINT` at your PubMed
-  MCP server.
+  A ready-to-run PubMed MCP server is included
+  ([tools/pubmed_mcp_server.py](tools/pubmed_mcp_server.py), see below).
 
-Phase 6 (the Streamlit review UI) is the remaining piece. See
-[HANDOFF.md](HANDOFF.md) for the full build order.
+- **Phase 6 complete** — Streamlit human-review UI ([ui.py](src/dermassist/ui.py)):
+  upload an image and run the pipeline, then review the report side-by-side
+  (original + preprocessed image, classifier probability bar chart, Claude's ABCDE
+  interpretation, cited literature) and **Approve / Reject / Edit** to resume the
+  graph through the SQLite checkpointer. Reject/Edit send reviewer notes back to
+  Claude and loop; the compliance disclaimer is pinned on every screen. Launch with
+  `uv sync --extra ui` then `uv run streamlit run src/dermassist/ui.py`.
+
+All six phases are implemented. See [HANDOFF.md](HANDOFF.md) for the original spec.
 
 ## Setup
 
@@ -91,6 +98,38 @@ uv run dermassist status --thread-id <THREAD_ID>
 State persists on disk (SQLite), so `run` and `resume` can be separate process
 invocations — the graph genuinely pauses and resumes.
 
+## Literature retrieval (PubMed MCP)
+
+A matching PubMed MCP server is bundled. In one terminal:
+
+```bash
+uv sync --extra literature
+uv run python tools/pubmed_mcp_server.py        # serves http://127.0.0.1:8000/mcp
+```
+
+Then add to `.env`:
+
+```bash
+MCP_ENDPOINT=http://127.0.0.1:8000/mcp
+MCP_PUBMED_TOOL=search_pubmed
+# NCBI_API_KEY=...   # optional; raises NCBI rate limit 3 -> 10 req/s
+```
+
+Now `dermassist run` (or the UI) queries real PubMed, embeds abstracts with
+PubMedBERT, and retrieves the top-k for the report. Without the server set, the
+`literature` node uses mock references so the pipeline still runs.
+
+## Review UI (Streamlit)
+
+```bash
+uv sync --extra ui
+uv run streamlit run src/dermassist/ui.py
+```
+
+Upload a dermatoscopic image, run the pipeline, review the report side-by-side, and
+Approve / Reject / Edit — the same graph and checkpointer as the CLI, driven from a
+browser. The disclaimer banner is pinned on screen.
+
 ## Test
 
 ```bash
@@ -105,16 +144,26 @@ persistence).
 
 ```
 src/dermassist/
-  compliance.py   # single source of the disclaimer (imported everywhere)
-  config.py       # pydantic-settings (.env) — API keys, DB URL, dataset path
-  schemas.py      # LesionState + LesionReport (+ 7 HAM10000 classes)
-  nodes.py        # pipeline nodes (preprocess real; classify/interpret/literature mocked)
-  preprocessing.py# Phase 2: load, resize, Shades-of-Gray, DullRazor hair removal
-  graph.py        # LangGraph wiring + SQLite checkpointer
-  cli.py          # run / resume / status
+  compliance.py    # single source of the disclaimer (imported everywhere)
+  config.py        # pydantic-settings (.env) — keys, DB URL, dataset/model config
+  schemas.py       # LesionState + LesionReport (+ 7 HAM10000 classes)
+  nodes.py         # pipeline nodes (real impls + mock fallbacks)
+  preprocessing.py # Phase 2: load, resize, Shades-of-Gray, DullRazor hair removal
+  classifier.py    # Phase 3: HF ViT, label normalization, softmax → 7-class probs
+  interpretation.py# Phase 4: Claude vision + forced tool-use → Pydantic ABCDE
+  literature.py    # Phase 5: PubMed-via-MCP + PubMedBERT + ChromaDB retrieval
+  ui.py            # Phase 6: Streamlit review UI
+  graph.py         # LangGraph wiring + SQLite checkpointer
+  cli.py           # run / resume / status
+tools/
+  pubmed_mcp_server.py # bundled PubMed MCP server (NCBI E-utilities, Streamable HTTP)
 tests/
-  test_graph.py        # Phase 1 acceptance tests
-  test_preprocessing.py# Phase 2 preprocessing tests
+  test_graph.py         # Phase 1 graph acceptance tests
+  test_preprocessing.py # Phase 2
+  test_classifier.py    # Phase 3
+  test_interpretation.py# Phase 4
+  test_literature.py    # Phase 5
+  test_ui.py            # Phase 6
 ```
 
 ## Tech stack
