@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Environment / secrets — NEVER commit
+.env
+*.env
+!.env.example
+
+# LangGraph checkpoints (local SQLite state)
+*.sqlite
+*.sqlite3
+*.db
+checkpoints/
+
+# Datasets — NEVER commit dataset images (HAM10000 / ISIC)
+data/
+datasets/
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.tif
+*.tiff
+# keep small repo assets if explicitly added under assets/
+!assets/**
+
+# ChromaDB / vector store
+.chroma/
+chroma/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
