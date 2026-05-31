@@ -23,6 +23,8 @@ class Settings(BaseSettings):
 
     # Claude / Anthropic (Phase 4+)
     anthropic_api_key: str | None = Field(default=None)
+    # Claude model for ABCDE interpretation + structured output.
+    claude_model: str = Field(default="claude-opus-4-8")
 
     # State persistence. SQLite for dev; a Postgres URL for prod (open decision).
     database_url: str = Field(default="sqlite:///checkpoints/dermassist.sqlite")

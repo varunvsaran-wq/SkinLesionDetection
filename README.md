@@ -35,10 +35,18 @@ The novel part is the **orchestration + resumable human-review gate**, not the M
   the preprocessed image and falls back to a mock when `torch` isn't installed.
   Enable with `uv sync --extra vision` (pulls in torch; first run downloads the
   checkpoint). The classifier — never Claude — owns the diagnostic probabilities.
+- **Phase 4 complete** — Claude ABCDE interpretation + structured output: Claude
+  (`claude-opus-4-8` by default) reads the preprocessed image, assesses the ABCDE
+  features, and reconciles its narrative with the classifier's probabilities,
+  forced through a Pydantic-validated schema via tool-use with prompt caching
+  ([interpretation.py](src/dermassist/interpretation.py)). Per §6, Claude is
+  instructed to never emit its own probabilities — the classifier owns those. The
+  `interpret` node uses it and falls back to a mock when `anthropic` isn't
+  installed or no `ANTHROPIC_API_KEY` is set. Enable with `uv sync --extra
+  reasoning` and set `ANTHROPIC_API_KEY` in `.env`.
 
-The remaining nodes (interpret, literature) are still mocked. See
-[HANDOFF.md](HANDOFF.md) for the build order (Phases 4–6 swap real models into the
-same interfaces).
+The `literature` node is still mocked. See [HANDOFF.md](HANDOFF.md) for the build
+order (Phases 5–6 swap real retrieval + the review UI into the same interfaces).
 
 ## Setup
 

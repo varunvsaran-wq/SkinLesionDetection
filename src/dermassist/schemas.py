@@ -76,6 +76,7 @@ class LesionState(BaseModel):
     preprocessed_path: Optional[str] = None
     classifier_result: Optional[ClassifierResult] = None
     interpretation: Optional[ABCDEFeatures] = None
+    reconciliation: Optional[str] = None  # Claude's narrative vs. classifier probs
     literature: list[LiteratureRef] = Field(default_factory=list)
     report: Optional[LesionReport] = None
     review_status: ReviewStatus = "pending"

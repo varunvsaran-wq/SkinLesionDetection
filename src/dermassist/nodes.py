@@ -14,11 +14,13 @@ Real implementations land per HANDOFF.md build order:
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from langgraph.types import interrupt
 
 from dermassist.compliance import DISCLAIMER
+from dermassist.config import get_settings
 from dermassist.schemas import (
     ABCDEFeatures,
     ClassifierResult,
@@ -108,25 +110,59 @@ def classify(state: LesionState) -> dict:
         return {"classifier_result": _mock_classifier_result()}
 
 
-def interpret(state: LesionState) -> dict:
-    """Claude's ABCDE narrative, reconciled with the classifier's probabilities.
-    (Phase 4 swaps in a real Claude tool-use call.)
-
-    On a review loop-back, reviewer notes are acknowledged so the re-interpretation
-    visibly responds to feedback.
-    """
-    note_suffix = ""
-    if state.reviewer_notes:
-        note_suffix = f" (revised per reviewer note: {state.reviewer_notes})"
-
+def _mock_interpretation(reviewer_notes: str | None) -> tuple[ABCDEFeatures, str]:
+    note_suffix = f" (revised per reviewer note: {reviewer_notes})" if reviewer_notes else ""
     features = ABCDEFeatures(
         asymmetry="Asymmetric across one axis." + note_suffix,
         border="Irregular, notched border with focal indistinctness.",
         color="Multiple shades: brown, black, and slate-blue.",
         diameter="Approximately 8 mm.",
-        evolution="Reported recent change in size/color (per intake).",
+        evolution="Evolution not observable from a single image.",
     )
-    return {"interpretation": features}
+    reconciliation = (
+        "Mock reconciliation: the qualitative ABCDE impression is broadly consistent "
+        "with the classifier's top differential."
+    )
+    return features, reconciliation
+
+
+def interpret(state: LesionState) -> dict:
+    """Claude's ABCDE narrative, reconciled with the classifier's probabilities
+    (Phase 4, real). Claude owns the qualitative narrative only — never the
+    diagnostic probabilities (HANDOFF.md §6).
+
+    Runs the real Claude vision + forced tool-use call on the preprocessed image;
+    falls back to a mock when anthropic isn't installed, no API key is configured,
+    or no real image exists. On a review loop-back, reviewer notes are passed
+    through so the re-interpretation responds to feedback.
+    """
+    img_path = Path(state.preprocessed_path or state.image_path)
+    has_api_key = bool(get_settings().anthropic_api_key or os.environ.get("ANTHROPIC_API_KEY"))
+
+    if state.classifier_result is None or not img_path.exists() or not has_api_key:
+        if state.classifier_result is None:
+            reason = "no classifier result yet"
+        elif not img_path.exists():
+            reason = f"'{img_path}' not found"
+        else:
+            reason = "no ANTHROPIC_API_KEY configured"
+        print(f"[interpret] {reason} — using mock interpretation.")
+        features, reconciliation = _mock_interpretation(state.reviewer_notes)
+        return {"interpretation": features, "reconciliation": reconciliation}
+
+    try:
+        from dermassist.interpretation import interpret_image
+
+        features, reconciliation = interpret_image(
+            img_path, state.classifier_result, state.reviewer_notes
+        )
+        print("[interpret] real Claude interpretation recorded.")
+        return {"interpretation": features, "reconciliation": reconciliation}
+    except ImportError as exc:
+        print(f"[interpret] anthropic not installed ({exc}); using mock. "
+              "Install with: uv sync --extra reasoning")
+        features, reconciliation = _mock_interpretation(state.reviewer_notes)
+        return {"interpretation": features, "reconciliation": reconciliation}
 
 
 def literature(state: LesionState) -> dict:
@@ -157,16 +193,19 @@ def build_report(state: LesionState) -> dict:
         reverse=True,
     )[:3]
 
+    recommendation = (
+        "Findings should be routed to a qualified human reviewer before any action."
+    )
+    if state.reconciliation:
+        recommendation = f"{state.reconciliation} {recommendation}"
+
     report = LesionReport(
         abcde=state.interpretation,
         classifier=state.classifier_result,
         differential=differential,
         literature=state.literature,
         overall_confidence=round(state.classifier_result.top_confidence * 0.9, 3),
-        recommendation=(
-            "Mocked recommendation: findings are consistent with the top "
-            "differential; route to a qualified human reviewer before any action."
-        ),
+        recommendation=recommendation,
         disclaimer=DISCLAIMER,
     )
     return {"report": report}
