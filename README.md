@@ -20,21 +20,31 @@ The novel part is the **orchestration + resumable human-review gate**, not the M
 
 ## Status
 
-**Phase 1 complete** — the full graph runs end-to-end with **mocked** nodes,
-pausing at the human-review gate via LangGraph `interrupt()` and resuming from a
-SQLite checkpointer. No real model is wired in yet. See [HANDOFF.md](HANDOFF.md)
-for the full build order (Phases 2–6 swap real models into the same interfaces).
+- **Phase 1 complete** — the full graph runs end-to-end, pausing at the
+  human-review gate via LangGraph `interrupt()` and resuming from a SQLite
+  checkpointer.
+- **Phase 2 complete** — real image preprocessing: PIL/OpenCV loader, resize,
+  Shades-of-Gray color constancy, and DullRazor-style hair removal
+  ([preprocessing.py](src/dermassist/preprocessing.py)). The `preprocess` node
+  runs it on a real image and falls back to a mock path when none is present.
+
+The remaining nodes (classify, interpret, literature) are still mocked. See
+[HANDOFF.md](HANDOFF.md) for the build order (Phases 3–6 swap real models into the
+same interfaces).
 
 ## Setup
 
 Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv sync --extra dev          # core + dev (pytest) deps
-cp .env.example .env         # optional for Phase 1; fill in for later phases
+uv sync --extra dev                    # core + dev (pytest) deps
+uv sync --extra preprocess --extra dev # + Phase 2 preprocessing (numpy/pillow/opencv)
+cp .env.example .env                   # optional now; fill in for later phases
 ```
 
-The mocked Phase-1 pipeline needs no API keys or dataset.
+The pipeline needs no API keys; preprocessing runs on any local image. Optional
+dependency groups: `preprocess` (Phase 2), `vision` (Phase 3, pulls in torch),
+`reasoning` (Phase 4), `literature` (Phase 5), `ui` (Phase 6).
 
 ## Run the pipeline (CLI)
 
@@ -71,11 +81,13 @@ src/dermassist/
   compliance.py   # single source of the disclaimer (imported everywhere)
   config.py       # pydantic-settings (.env) — API keys, DB URL, dataset path
   schemas.py      # LesionState + LesionReport (+ 7 HAM10000 classes)
-  nodes.py        # all pipeline nodes (Phase 1: mocked, drop-in for real later)
+  nodes.py        # pipeline nodes (preprocess real; classify/interpret/literature mocked)
+  preprocessing.py# Phase 2: load, resize, Shades-of-Gray, DullRazor hair removal
   graph.py        # LangGraph wiring + SQLite checkpointer
   cli.py          # run / resume / status
 tests/
-  test_graph.py   # Phase 1 acceptance tests
+  test_graph.py        # Phase 1 acceptance tests
+  test_preprocessing.py# Phase 2 preprocessing tests
 ```
 
 ## Tech stack

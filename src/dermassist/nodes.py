@@ -40,10 +40,26 @@ def ingest(state: LesionState) -> dict:
 
 
 def preprocess(state: LesionState) -> dict:
-    """Resize + color constancy + hair removal. (Phase 2 will make this real.)"""
+    """Resize + Shades-of-Gray color constancy + DullRazor hair removal (Phase 2, real).
+
+    If the source image exists on disk, run the real pipeline and write the result
+    to ``artifacts/preprocessed/``. If it doesn't (e.g. the mocked, dataset-free
+    smoke demo), fall back to deriving a path string so the graph still flows.
+    """
     src = Path(state.image_path)
-    preprocessed = str(src.with_name(f"{src.stem}__preprocessed{src.suffix or '.png'}"))
-    return {"preprocessed_path": preprocessed}
+    out_dir = Path("artifacts/preprocessed")
+    out_path = out_dir / f"{src.stem}__preprocessed.png"
+
+    if not src.exists():
+        print(f"[preprocess] note: '{src}' not found — skipping real preprocessing (mock path).")
+        return {"preprocessed_path": str(out_path)}
+
+    # Imported lazily so the core (Phase 1) install doesn't require opencv/numpy.
+    from dermassist.preprocessing import preprocess_image
+
+    written = preprocess_image(src, out_path)
+    print(f"[preprocess] wrote preprocessed image -> {written}")
+    return {"preprocessed_path": str(written)}
 
 
 def classify(state: LesionState) -> dict:

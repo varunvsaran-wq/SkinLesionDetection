@@ -35,6 +35,9 @@ datasets/
 .chroma/
 chroma/
 
+# Generated artifacts (preprocessed images, etc.)
+artifacts/
+
 # Tooling
 .pytest_cache/
 .mypy_cache/

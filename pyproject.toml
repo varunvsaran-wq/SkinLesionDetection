@@ -21,11 +21,15 @@ dependencies = [
 reasoning = [
     "anthropic>=0.40",
 ]
-# Phase 2/3 — preprocessing + vision classifier
-vision = [
+# Phase 2 — image preprocessing (lightweight: no torch)
+preprocess = [
+    "numpy>=1.26",
     "pillow>=10.0",
     "opencv-python>=4.9",
-    "numpy>=1.26",
+]
+# Phase 3 — vision classifier (heavy: pulls in torch). Includes preprocess.
+vision = [
+    "dermassist[preprocess]",
     "torch>=2.2",
     "torchvision>=0.17",
     "transformers>=4.44",
