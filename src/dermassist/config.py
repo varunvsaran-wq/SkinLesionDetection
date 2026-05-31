@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     # Dataset (Phase 2+)
     dataset_path: Path = Field(default=Path("data/ham10000"))
 
+    # Vision classifier (Phase 3). A HuggingFace transformers image-classification
+    # checkpoint trained on the 7 HAM10000 classes. Open decision (HANDOFF.md §8) —
+    # this is a sensible default ViT; override CLASSIFIER_MODEL to swap it.
+    classifier_model: str = Field(default="Anwarkh1/Skin_Cancer-Image_Classification")
+    # Temperature for softmax. 1.0 = raw model output; fit >1 on a validation set
+    # to calibrate over-confident probabilities (temperature scaling).
+    classifier_temperature: float = Field(default=1.0, gt=0)
+
     # Literature retrieval (Phase 5+)
     mcp_endpoint: str | None = Field(default=None)
 

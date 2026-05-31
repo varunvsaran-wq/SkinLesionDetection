@@ -27,9 +27,17 @@ The novel part is the **orchestration + resumable human-review gate**, not the M
   Shades-of-Gray color constancy, and DullRazor-style hair removal
   ([preprocessing.py](src/dermassist/preprocessing.py)). The `preprocess` node
   runs it on a real image and falls back to a mock path when none is present.
+- **Phase 3 complete** — real vision classifier: a pretrained HuggingFace ViT
+  (`Anwarkh1/Skin_Cancer-Image_Classification` by default, configurable via
+  `CLASSIFIER_MODEL`) producing probabilities over the 7 HAM10000 classes with
+  robust label normalization and optional temperature scaling
+  ([classifier.py](src/dermassist/classifier.py)). The `classify` node uses it on
+  the preprocessed image and falls back to a mock when `torch` isn't installed.
+  Enable with `uv sync --extra vision` (pulls in torch; first run downloads the
+  checkpoint). The classifier — never Claude — owns the diagnostic probabilities.
 
-The remaining nodes (classify, interpret, literature) are still mocked. See
-[HANDOFF.md](HANDOFF.md) for the build order (Phases 3–6 swap real models into the
+The remaining nodes (interpret, literature) are still mocked. See
+[HANDOFF.md](HANDOFF.md) for the build order (Phases 4–6 swap real models into the
 same interfaces).
 
 ## Setup

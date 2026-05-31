@@ -62,11 +62,9 @@ def preprocess(state: LesionState) -> dict:
     return {"preprocessed_path": str(written)}
 
 
-def classify(state: LesionState) -> dict:
-    """Dedicated vision classifier. The classifier OWNS calibrated probabilities
-    over the 7 HAM10000 classes (never Claude). (Phase 3 swaps in a real model.)
-    """
-    # Mock distribution: plausible melanoma-leaning case. Sums to 1.0.
+def _mock_classifier_result() -> ClassifierResult:
+    """Plausible melanoma-leaning distribution (sums to 1.0). Used as a fallback
+    when torch/transformers or a real image are unavailable (dataset-free demo)."""
     probabilities = {
         "akiec": 0.03,
         "bcc": 0.05,
@@ -77,12 +75,37 @@ def classify(state: LesionState) -> dict:
         "vasc": 0.03,
     }
     top_label = max(probabilities, key=probabilities.__getitem__)
-    result = ClassifierResult(
+    return ClassifierResult(
         label=top_label,
         probabilities=probabilities,
         top_confidence=probabilities[top_label],
     )
-    return {"classifier_result": result}
+
+
+def classify(state: LesionState) -> dict:
+    """Dedicated vision classifier (Phase 3, real).
+
+    The classifier OWNS the calibrated probabilities over the 7 HAM10000 classes
+    (never Claude — HANDOFF.md §6). Runs the real HuggingFace model on the
+    preprocessed image; falls back to a mock distribution when torch/transformers
+    aren't installed or no real image exists, so the graph still flows.
+    """
+    img_path = Path(state.preprocessed_path or state.image_path)
+
+    if not img_path.exists():
+        print(f"[classify] note: '{img_path}' not found — using mock classifier output.")
+        return {"classifier_result": _mock_classifier_result()}
+
+    try:
+        from dermassist.classifier import classify_image
+
+        result = classify_image(img_path)
+        print(f"[classify] real classifier -> {result.label} ({result.top_confidence:.3f})")
+        return {"classifier_result": result}
+    except ImportError as exc:
+        print(f"[classify] vision deps not installed ({exc}); using mock output. "
+              "Install with: uv sync --extra vision")
+        return {"classifier_result": _mock_classifier_result()}
 
 
 def interpret(state: LesionState) -> dict:
