@@ -35,7 +35,9 @@ def load_image(path: str | Path) -> np.ndarray:
     if not path.exists():
         raise FileNotFoundError(f"Image not found: {path}")
     with Image.open(path) as im:
-        return np.asarray(im.convert("RGB"), dtype=np.uint8)
+        # np.array (not asarray) returns a writable copy — avoids a non-writable
+        # tensor warning when the array is later handed to torch/OpenCV.
+        return np.array(im.convert("RGB"), dtype=np.uint8)
 
 
 def save_image(img: np.ndarray, path: str | Path) -> Path:
