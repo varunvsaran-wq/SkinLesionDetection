@@ -45,8 +45,19 @@ The novel part is the **orchestration + resumable human-review gate**, not the M
   installed or no `ANTHROPIC_API_KEY` is set. Enable with `uv sync --extra
   reasoning` and set `ANTHROPIC_API_KEY` in `.env`.
 
-The `literature` node is still mocked. See [HANDOFF.md](HANDOFF.md) for the build
-order (Phases 5–6 swap real retrieval + the review UI into the same interfaces).
+- **Phase 5 complete** — literature retrieval: PubMed is queried via a configurable
+  **MCP server** (`MCP_ENDPOINT` + `MCP_PUBMED_TOOL`) keyed off the top differential;
+  abstracts are embedded with **PubMedBERT** (local sentence-transformers) and
+  stored in a **local ChromaDB** collection, then the top-k most relevant are
+  retrieved for grounding ([literature.py](src/dermassist/literature.py)).
+  Relevance notes are extractive by default; an opt-in Claude-authored mode is
+  gated behind `LITERATURE_CLAUDE_CITATIONS`. The `literature` node falls back to
+  mock references when `MCP_ENDPOINT` is unset/unreachable or deps are missing.
+  Enable with `uv sync --extra literature` and point `MCP_ENDPOINT` at your PubMed
+  MCP server.
+
+Phase 6 (the Streamlit review UI) is the remaining piece. See
+[HANDOFF.md](HANDOFF.md) for the full build order.
 
 ## Setup
 

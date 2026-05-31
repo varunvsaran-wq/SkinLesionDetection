@@ -41,7 +41,20 @@ class Settings(BaseSettings):
     classifier_temperature: float = Field(default=1.0, gt=0)
 
     # Literature retrieval (Phase 5+)
+    # PubMed MCP server endpoint (Streamable HTTP). Unset → node uses mock abstracts.
     mcp_endpoint: str | None = Field(default=None)
+    # Name of the search tool exposed by your PubMed MCP server.
+    mcp_pubmed_tool: str = Field(default="search_pubmed")
+    # Local biomedical embedding model (sentence-transformers). Downloads on first use.
+    embedding_model: str = Field(default="NeuML/pubmedbert-base-embeddings")
+    # Local ChromaDB persistence directory.
+    chroma_path: Path = Field(default=Path("artifacts/chroma"))
+    # How many PubMed candidates to fetch, and how many to keep after re-ranking.
+    pubmed_retmax: int = Field(default=20, gt=0)
+    literature_top_k: int = Field(default=3, gt=0)
+    # Opt-in: have Claude author the per-reference relevance notes (one extra API
+    # call). Off by default — the extractive notes are free and deterministic.
+    literature_claude_citations: bool = Field(default=False)
 
     # Environment label
     app_env: str = Field(default="dev")

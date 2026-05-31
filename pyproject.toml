@@ -34,9 +34,11 @@ vision = [
     "torchvision>=0.17",
     "transformers>=4.44",
 ]
-# Phase 5 — literature retrieval
+# Phase 5 — literature retrieval (PubMed MCP + local PubMedBERT + local ChromaDB)
 literature = [
     "chromadb>=0.5",
+    "sentence-transformers>=3.0",
+    "mcp>=1.2",
 ]
 # Phase 6 — review UI
 ui = [

@@ -165,9 +165,8 @@ def interpret(state: LesionState) -> dict:
         return {"interpretation": features, "reconciliation": reconciliation}
 
 
-def literature(state: LesionState) -> dict:
-    """PubMed retrieval keyed off the top differential. (Phase 5 makes this real.)"""
-    refs = [
+def _mock_literature() -> list[LiteratureRef]:
+    return [
         LiteratureRef(
             pmid="00000000",
             title="Dermoscopy of melanoma and its mimics: a practical review.",
@@ -179,7 +178,49 @@ def literature(state: LesionState) -> dict:
             relevance_note="Context for classifier probability calibration.",
         ),
     ]
-    return {"literature": refs}
+
+
+def literature(state: LesionState) -> dict:
+    """PubMed retrieval keyed off the top differential (Phase 5, real).
+
+    Queries PubMed via the configured MCP server, embeds abstracts with PubMedBERT,
+    stores them in a local ChromaDB collection, and retrieves the top-k most
+    relevant for grounding. Falls back to mock references when MCP_ENDPOINT is unset
+    or unreachable, or when the literature deps aren't installed.
+    """
+    differential = (
+        state.classifier_result and sorted(
+            state.classifier_result.probabilities,
+            key=state.classifier_result.probabilities.__getitem__,
+            reverse=True,
+        )[:3]
+    ) or ["mel"]
+
+    if not get_settings().mcp_endpoint:
+        print("[literature] MCP_ENDPOINT not configured — using mock references.")
+        return {"literature": _mock_literature()}
+
+    interp_text = None
+    if state.interpretation is not None:
+        f = state.interpretation
+        interp_text = f"{f.asymmetry} {f.border} {f.color}"
+
+    try:
+        from dermassist.literature import retrieve_literature
+
+        refs = retrieve_literature(differential, interpretation_text=interp_text)
+        if not refs:
+            print("[literature] MCP returned no abstracts — using mock references.")
+            return {"literature": _mock_literature()}
+        print(f"[literature] retrieved {len(refs)} reference(s) from PubMed via MCP.")
+        return {"literature": refs}
+    except ImportError as exc:
+        print(f"[literature] literature deps not installed ({exc}); using mock. "
+              "Install with: uv sync --extra literature")
+        return {"literature": _mock_literature()}
+    except Exception as exc:  # MCP unreachable / tool error — degrade gracefully.
+        print(f"[literature] retrieval failed ({type(exc).__name__}: {exc}); using mock.")
+        return {"literature": _mock_literature()}
 
 
 def build_report(state: LesionState) -> dict:
